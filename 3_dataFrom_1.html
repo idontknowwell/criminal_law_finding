@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>형법 조문 검색</title>
+  <style>
+    label, input, button, select {
+      font-size: 1.1em;
+      margin: 5px;
+    }
+    #result, #details {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      white-space: pre-wrap;
+      font-family: '나눔고딕', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <h1>형법 조문 검색</h1>
+
+  <label for="input죄명">죄명:</label>
+  <select id="input죄명">
+    <option value="">-- 죄명 선택 --</option>
+  </select>
+  <button id="searchBtn">검색</button>
+
+  <div id="result"></div>
+  <div id="details"></div>
+
+  <!-- lawData.js 파일을 미리 로드 -->
+  <script src="3_data.js"></script>
+
+  <script>
+    // 페이지 로드시 죄명 드롭다운 채우기
+    window.addEventListener('DOMContentLoaded', () => {
+      const select = document.getElementById('input죄명');
+      const addedSet = new Set();
+
+      lawData.forEach(item => {
+        // 형량세부에 유효 형종이 있는지 확인
+        const hasValid형량 = Object.entries(item.형량세부).some(([형종, 값]) => {
+          return (typeof 값 === 'object' && 값.존재여부 === 1) || (typeof 값 === 'number' && 값 === 1);
+        });
+
+        // 유효 형량이 있는 경우만 추가
+        if (hasValid형량 && !addedSet.has(`${item.조항} - ${item.조문제목}`)) {
+          const option = document.createElement('option');
+          option.value = `${item.조항} - ${item.조문제목}`;   // value에 조항 + 조문제목 사용
+          option.textContent = `${item.조항} - ${item.조문제목}`; // 표시 텍스트도 동일
+          select.appendChild(option);
+          addedSet.add(`${item.조항} - ${item.조문제목}`);
+        }
+      });
+    });
+
+    function 검색실행() {
+      const 죄명 = document.getElementById('input죄명').value.trim();
+      const resultDiv = document.getElementById('result');
+      const detailsDiv = document.getElementById('details');
+      resultDiv.innerHTML = '';
+      detailsDiv.innerHTML = '';
+
+      if (!죄명) {
+        resultDiv.textContent = "죄명을 선택하세요.";
+        return;
+      }
+
+      const found = lawData.find(item =>
+        `${item.조항} - ${item.조문제목}` === 죄명
+      );
+
+      if (found) {
+        resultDiv.innerHTML = `
+          <strong>조항:</strong> ${found.조항}<br>
+          <strong>조문제목:</strong> ${found.조문제목}<br>
+          <strong>범죄내용:</strong> ${found.범죄내용 || '없음'}<br>
+        `;
+
+        const 형량세부 = found.형량세부;
+        const 유효형종 = [];
+
+        for (const [형종, 값] of Object.entries(형량세부)) {
+          if (typeof 값 === 'object' && 값.존재여부 === 1) {
+            유효형종.push(형종);
+          } else if (typeof 값 === 'number' && 값 === 1) {
+            유효형종.push(형종);
+          }
+        }
+
+        if (유효형종.length > 0) {
+          const select = document.createElement('select');
+          select.id = '형종Select';
+          select.innerHTML = '<option value="">-- 형의 종류 선택 --</option>';
+
+          유효형종.forEach(형종 => {
+            const option = document.createElement('option');
+            option.value = 형종;
+            option.textContent = 형종;
+            select.appendChild(option);
+          });
+
+          resultDiv.appendChild(document.createElement('br'));
+          resultDiv.appendChild(document.createTextNode('형의 종류 선택: '));
+          resultDiv.appendChild(select);
+
+          select.addEventListener('change', function() {
+            const 선택형종 = this.value;
+            if (!선택형종) {
+              detailsDiv.innerHTML = '';
+              return;
+            }
+
+            const 값 = 형량세부[선택형종];
+            let 출력내용 = `<strong>${선택형종}</strong><br>`;
+
+            if (typeof 값 === 'object') {
+              if ('기간상단' in 값 || '기간하단' in 값) {
+                출력내용 += `기간상단: ${값.기간상단 || '없음'}<br>`;
+                출력내용 += `기간하단: ${값.기간하단 || '없음'}<br>`;
+              }
+              if ('금액상단' in 값 || '금액하단' in 값) {
+                출력내용 += `금액상단: ${값.금액상단 || '없음'}<br>`;
+                출력내용 += `금액하단: ${값.금액하단 || '없음'}<br>`;
+              }
+            } else {
+              출력내용 += '추가 정보 없음';
+            }
+
+            detailsDiv.innerHTML = 출력내용;
+          });
+
+        } else {
+          resultDiv.innerHTML += '<br>해당 조문에는 형량 정보가 없습니다.';
+        }
+
+      } else {
+        resultDiv.textContent = "일치하는 죄명이 없습니다.";
+      }
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', 검색실행);
+  </script>
+</body>
+</html>
